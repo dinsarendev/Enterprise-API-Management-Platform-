@@ -1,0 +1,107 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: gateway-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:9000/oauth2/jwks}
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 30s
+      default-filters:
+        - RemoveRequestHeader=Cookie
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: ${GATEWAY_RATE_LIMIT_REPLENISH_RATE:100}
+            redis-rate-limiter.burstCapacity: ${GATEWAY_RATE_LIMIT_BURST_CAPACITY:200}
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@principalOrRemoteAddressKeyResolver}"
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+          predicates:
+            - name: Path
+              args:
+                pattern: "'/api/' + serviceId + '/**'"
+          filters:
+            - name: RewritePath
+              args:
+                regexp: "'/api/' + serviceId + '/?(?<remaining>.*)'"
+                replacement: "'/${remaining}'"
+      routes:
+        - id: config-service
+          uri: lb://config-service
+          predicates:
+            - Path=/internal/config/**
+          filters:
+            - RewritePath=/internal/config/?(?<remaining>.*), /${remaining}
+
+gateway:
+  security:
+    api-key:
+      enabled: ${API_KEY_AUTH_ENABLED:true}
+      header-name: ${API_KEY_HEADER_NAME:X-API-Key}
+      clients:
+        - client-id: ${DEFAULT_API_CLIENT_ID:local-client}
+          tenant-id: ${DEFAULT_TENANT_ID:local-tenant}
+          sha256: ${DEFAULT_API_KEY_SHA256:024f6c9525465fbec0047e2686f02a413c52241fde8af273148c419fa18fb312}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+    gateway:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+eureka:
+  instance:
+    prefer-ip-address: ${EUREKA_PREFER_IP_ADDRESS:true}
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    metadata-map:
+      zone: ${EUREKA_ZONE:default}
+      management.port: ${SERVER_PORT:8080}
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery_admin:change-me@localhost:8761/eureka/}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: INFO
+    com.netflix.discovery: WARN

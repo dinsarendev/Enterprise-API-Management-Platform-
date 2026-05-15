@@ -15,6 +15,7 @@
     <modules>
         <module>discovery-service</module>
         <module>config-service</module>
+        <module>gateway-service</module>
     </modules>
 
     <properties>

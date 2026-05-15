@@ -1,0 +1,39 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: gateway-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    networks:
+      - apim-platform
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gateway-service
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      REDIS_HOST: redis
+      EUREKA_DEFAULT_ZONE: http://discovery_admin:change-me@discovery-service:8761/eureka/
+      JWT_JWK_SET_URI: http://auth-service:9000/oauth2/jwks
+      DEFAULT_API_CLIENT_ID: local-client
+      DEFAULT_TENANT_ID: local-tenant
+      DEFAULT_API_KEY_SHA256: 024f6c9525465fbec0047e2686f02a413c52241fde8af273148c419fa18fb312
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - apim-platform
+
+networks:
+  apim-platform:
+    external: true
