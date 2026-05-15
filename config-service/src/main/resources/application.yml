@@ -1,0 +1,82 @@
+server:
+  port: ${SERVER_PORT:8888}
+  shutdown: graceful
+
+spring:
+  application:
+    name: config-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:native}
+  security:
+    user:
+      name: ${CONFIG_USERNAME:config_admin}
+      password: ${CONFIG_PASSWORD:change-me}
+      roles: CONFIG,OPS
+  cloud:
+    config:
+      server:
+        native:
+          search-locations:
+            - ${CONFIG_NATIVE_SEARCH_LOCATION:file:///config-repo/}
+            - ${CONFIG_NATIVE_SEARCH_LOCATION:file:///config-repo/}{application}/{profile}/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+eureka:
+  instance:
+    prefer-ip-address: ${EUREKA_PREFER_IP_ADDRESS:true}
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    metadata-map:
+      zone: ${EUREKA_ZONE:default}
+      management.port: ${SERVER_PORT:8888}
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:true}
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery_admin:change-me@localhost:8761/eureka/}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.config: INFO
+    com.netflix.discovery: WARN
+
+---
+spring:
+  config:
+    activate:
+      on-profile: git
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${CONFIG_GIT_URI}
+          default-label: ${CONFIG_GIT_DEFAULT_LABEL:main}
+          clone-on-start: true
+          force-pull: true
+          timeout: 10
+          search-paths: ${CONFIG_GIT_SEARCH_PATHS:{application},{application}/{profile}}
+          username: ${CONFIG_GIT_USERNAME:}
+          password: ${CONFIG_GIT_PASSWORD:}

@@ -1,0 +1,28 @@
+services:
+  config-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: config-service
+    ports:
+      - "8888:8888"
+    environment:
+      SERVER_PORT: 8888
+      CONFIG_USERNAME: config_admin
+      CONFIG_PASSWORD: change-me
+      CONFIG_GIT_URI: file:///config-repo
+      EUREKA_DEFAULT_ZONE: http://discovery_admin:change-me@discovery-service:8761/eureka/
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    volumes:
+      - ./config-repo:/config-repo:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health/readiness | grep UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - apim-platform
+
+networks:
+  apim-platform:
+    external: true
