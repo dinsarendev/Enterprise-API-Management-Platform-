@@ -1,0 +1,25 @@
+services:
+  discovery-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_INSTANCE_HOSTNAME: discovery-service
+      DISCOVERY_USERNAME: discovery_admin
+      DISCOVERY_PASSWORD: change-me
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health/readiness | grep UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - apim-platform
+
+networks:
+  apim-platform:
+    driver: bridge
